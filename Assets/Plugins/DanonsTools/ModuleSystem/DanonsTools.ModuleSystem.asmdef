@@ -1,0 +1,17 @@
+{
+    "name": "DanonsTools.ModuleSystem",
+    "rootNamespace": "DanonsTools",
+    "references": [
+        "GUID:f51ebe6a0ceec4240a699833d6309b23",
+        "GUID:6db61c90b44313347a5a8e743e14a561"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
