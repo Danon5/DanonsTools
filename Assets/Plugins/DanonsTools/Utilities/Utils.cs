@@ -9,7 +9,7 @@ using Vector2 = UnityEngine.Vector2;
 using Vector3 = UnityEngine.Vector3;
 using Color = UnityEngine.Color;
 
-namespace DanonsTools.DanonsTools.Utilities
+namespace DanonsTools.Utilities
 {
     public static class Utils
     {
