@@ -10,7 +10,7 @@ namespace DanonsTools.FactoryPattern
 
         public static void Bind<I, T>(in T implementation) where T : I => _container.Bind<I, T>(implementation);
 
-        public static void Retrieve<I>() => _container.Resolve<I>();
+        public static I Retrieve<I>() => _container.Resolve<I>();
 
         public static void ClearBindings() => _container.ClearBindings();
     }
