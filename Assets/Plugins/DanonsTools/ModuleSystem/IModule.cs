@@ -6,6 +6,5 @@ namespace DanonsTools.ModuleSystem
     {
         public UniTask LoadAsync();
         public UniTask UnloadAsync();
-        public UniTask SetModuleActiveAsync();
     }
 }

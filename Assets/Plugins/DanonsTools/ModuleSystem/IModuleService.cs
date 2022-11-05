@@ -1,6 +1,4 @@
-﻿using DanonsTools.ServiceLayer;
-
-namespace DanonsTools.ModuleSystem
+﻿namespace DanonsTools.ModuleSystem
 {
     public interface IModuleService
     {

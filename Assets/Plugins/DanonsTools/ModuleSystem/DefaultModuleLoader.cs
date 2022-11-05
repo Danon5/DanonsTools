@@ -6,50 +6,74 @@ namespace DanonsTools.ModuleSystem
 {
     public sealed class DefaultModuleLoader : IModuleLoader
     {
-        private readonly Dictionary<Type, IModule> _loadedModules = new Dictionary<Type, IModule>();
+        private readonly Dictionary<Type, IModule> _modules = new();
+        private readonly List<Type> _loadingModules = new();
+        private readonly List<Type> _unloadingModules = new();
 
-        public async UniTask<T> LoadModuleAsync<T>() where T : IModule, new()
+        public async UniTask<T> LoadModuleAsync<T>(T module) where T : IModule
         {
             var type = typeof(T);
-
-            if (_loadedModules.ContainsKey(type))
+            
+            if (_modules.ContainsKey(type))
                 throw new Exception($"Cannot load already loaded module {type.Name}.");
-            
-            var module = new T();
 
-            await module.LoadAsync();
+            _modules.Add(type, module);
             
-            _loadedModules.Add(type, module);
+            _loadingModules.Add(type);
+            
+            await module.LoadAsync();
+
+            _loadingModules.Remove(type);
 
             return module;
         }
 
-        public async UniTask UnloadModuleAsync<T>() where T : IModule, new()
+        public async UniTask UnloadModuleAsync<T>() where T : IModule
         {
             var type = typeof(T);
 
-            if (!_loadedModules.ContainsKey(type))
+            if (!_modules.ContainsKey(type))
                 throw new Exception($"Cannot unload already unloaded module {type.Name}.");
 
-            var module = _loadedModules[type];
+            var module = _modules[type];
+            
+            _modules.Remove(type);
 
+            _unloadingModules.Add(type);
+            
             await module.UnloadAsync();
 
-            _loadedModules.Remove(type);
+            _unloadingModules.Remove(type);
         }
 
-        public bool TryGetModule<T>(out T module) where T : IModule, new()
+        public bool TryGetModule<T>(out T module) where T : IModule
         {
             var type = typeof(T);
             
-            if (_loadedModules.ContainsKey(type))
+            if (_modules.ContainsKey(type))
             {
-                module = (T)_loadedModules[type];
+                module = (T)_modules[type];
                 return true;
             }
             
             module = default;
             return false;
+        }
+
+        public bool ModuleExists<T>()
+        {
+            return _modules.ContainsKey(typeof(T));
+        }
+
+        public bool ModuleIsLoading<T>() where T : IModule
+        {
+            return _loadingModules.Contains(typeof(T));
+        }
+
+        public bool ModuleIsLoaded<T>() where T : IModule
+        {
+            var type = typeof(T);
+            return _modules.ContainsKey(type) && !_loadingModules.Contains(type);
         }
     }
 }
