@@ -5,6 +5,9 @@ using DanonsTools.EventLayer;
 using DarkRift;
 using DarkRift.Client;
 using DarkRift.Client.Unity;
+using MessagePack;
+using MessagePack.Resolvers;
+using Random = UnityEngine.Random;
 
 namespace DanonsTools.Networking
 {
@@ -12,29 +15,46 @@ namespace DanonsTools.Networking
     {
         public Action<Exception> ConnectedEvent { get; set; }
         public Action<Exception>  DisconnectedEvent { get; set; }
+        public Action<int> ProfiledOutgoingMessageEvent { get; set; }
+        public Action<int> ProfiledIncomingMessageEvent { get; set; }
         public MessageIdRegistry MessageIdRegistry { get; }
         public ClientMessageEventBus MessageEventBus { get; }
         public UnityClient Client { get; }
         public ConnectionState ConnectionState => Client.ConnectionState;
         public bool IsHosting { get; private set; }
+        public bool NetworkProfilingEnabled { get; set; }
+        public bool LatencyEmulationEnabled { get; set; }
+        public bool PacketLossEmulationEnabled { get; set; }
 
-        private readonly IGlobalEventService _globalEventService;
+        private readonly EventBus _globalEventBus;
+        private readonly MessagePackSerializerOptions _options;
+
+        private int _latencyMs;
+        private float _packetLossChance;
         
-        public DarkRiftClientManager(in UnityClient unityClient, in IGlobalEventService globalEventService)
+        public DarkRiftClientManager(in UnityClient unityClient, in EventBus globalEventBus)
         {
-            _globalEventService = globalEventService;
+            _globalEventBus = globalEventBus;
             Client = unityClient;
             MessageIdRegistry = new MessageIdRegistry();
             MessageEventBus = new ClientMessageEventBus();
 
             Client.Disconnected += OnDisconnected;
+            
+            var resolver = CompositeResolver.Create(
+                MessagePack.Unity.Extension.UnityBlitResolver.Instance,
+                MessagePack.Unity.UnityResolver.Instance,
+                StaticCompositeResolver.Instance,
+                StandardResolver.Instance);
+
+            _options = MessagePackSerializerOptions.Standard.WithResolver(resolver);
         }
 
         public async UniTask<bool> ConnectAsync(string ip, ushort port, bool isLocalServer)
         {
             if (ConnectionState == ConnectionState.Connecting) return false;
 
-            Client.ConnectInBackground(IPAddress.Parse(ip), port, false, OnConnected);
+            Client.ConnectInBackground(IPAddress.Parse(ip), port, true, OnConnected);
 
             await UniTask.WaitUntil(() => ConnectionState != ConnectionState.Connecting);
             
@@ -73,42 +93,83 @@ namespace DanonsTools.Networking
             IsHosting = false;
         }
 
-        public void SendMessageLocal(in INetworkMessage message)
+        public void SendMessage<T>(in T message, in SendMode sendMode) where T : INetworkMessage
         {
+            if (PacketLossEmulationEnabled && sendMode == SendMode.Unreliable && Random.Range(0f, 1f) <= _packetLossChance)
+                return;
+
+            if (LatencyEmulationEnabled && _latencyMs > 0)
+            {
+                SendMessageWithLatency(message, sendMode).Forget();
+                return;
+            }
+            
             if (Client.ConnectionState != ConnectionState.Connected)
                 throw new Exception("Cannot send message with no active server.");
-            
+
             if (!MessageIdRegistry.TryGetId(message.GetType(), out var id))
                 throw new Exception($"Attempting to send unregistered message type {message.GetType()}");
 
-            using var packagedMessage = Message.Create(id, message);
-            
-            _globalEventService.EventBus.Invoke(new LocalMessageFromClientReceivedEvent(packagedMessage));
-        }
+            using var writer = DarkRiftWriter.Create();
 
-        public void SendMessage(in INetworkMessage message, in SendMode sendMode)
-        {
-            if (Client.ConnectionState != ConnectionState.Connected)
-                throw new Exception("Cannot send message with no active server.");
-            
-            if (!MessageIdRegistry.TryGetId(message.GetType(), out var id))
-                throw new Exception($"Attempting to send unregistered message type {message.GetType()}");
-            
-            using var packagedMessage = Message.Create(id, message);
-            
+            var serializedMessage = MessagePackSerializer.Serialize(message.GetType(), message, _options);
+            writer.Write(serializedMessage.Length);
+            writer.WriteRaw(serializedMessage, 0, serializedMessage.Length);
+
+            using var packedMessage = Message.Create(id, writer);
+
             if (IsHosting)
-                SendMessageLocal(message);
+                _globalEventBus.Invoke(new LocalMessageFromClientReceivedEvent
+                {
+                    UnpackedMessage = message
+                });
             else
-                Client.SendMessage(packagedMessage, sendMode);
+                Client.SendMessage(packedMessage, sendMode);
+            
+            if (NetworkProfilingEnabled)
+                ProfiledOutgoingMessageEvent?.Invoke(packedMessage.DataLength);
         }
 
-        public void OnLocalMessageFromServerReceived(IEvent @event)
+        public void ConfigureLatencyEmulation(in int latencyMs)
         {
-            var eventData = (LocalMessageFromServerReceivedEvent)@event;
-
-            HandleMessage(eventData.Message);
+            _latencyMs = latencyMs;
         }
-        
+
+        public void ConfigurePacketLossEmulation(in float packetLossChance)
+        {
+            _packetLossChance = packetLossChance;
+        }
+
+        private async UniTaskVoid SendMessageWithLatency<T>(T message, SendMode sendMode) where T : INetworkMessage
+        {
+            await UniTask.Delay(_latencyMs);
+            
+            if (Client.ConnectionState != ConnectionState.Connected)
+                throw new Exception("Cannot send message with no active server.");
+
+            if (!MessageIdRegistry.TryGetId(message.GetType(), out var id))
+                throw new Exception($"Attempting to send unregistered message type {message.GetType()}");
+
+            using var writer = DarkRiftWriter.Create();
+
+            var serializedMessage = MessagePackSerializer.Serialize(message, _options);
+            writer.Write(serializedMessage.Length);
+            writer.WriteRaw(serializedMessage, 0, serializedMessage.Length);
+
+            using var packedMessage = Message.Create(id, writer);
+
+            if (IsHosting)
+                _globalEventBus.Invoke(new LocalMessageFromClientReceivedEvent
+                {
+                    UnpackedMessage = message
+                });
+            else
+                Client.SendMessage(packedMessage, sendMode);
+
+            if (NetworkProfilingEnabled)
+                ProfiledOutgoingMessageEvent?.Invoke(packedMessage.DataLength);
+        }
+
         private void OnConnected(Exception exception)
         {
             if (exception != null)
@@ -117,29 +178,77 @@ namespace DanonsTools.Networking
                 return;
             }
 
-            Client.MessageReceived += OnMessageReceived;
+            Client.MessageReceived += OnPackedMessageReceived;
         }
 
         private void OnDisconnected(object sender, DisconnectedEventArgs disconnectedEventArgs)
         {
             DisconnectedEvent?.Invoke(null);
             
-            Client.MessageReceived -= OnMessageReceived;
+            Client.MessageReceived -= OnPackedMessageReceived;
         }
-        
-        private void OnMessageReceived(object sender, MessageReceivedEventArgs e)
+
+        public void OnLocalPackedMessageReceived(IEvent @event)
+        {
+            var eventData = (LocalMessageFromServerReceivedEvent)@event;
+            var unpackedMessage = eventData.UnpackedMessage;
+
+            if (NetworkProfilingEnabled)
+            {
+                using var writer = DarkRiftWriter.Create();
+            
+                var serializedMessage = MessagePackSerializer.Serialize(unpackedMessage.GetType(), unpackedMessage, _options);
+                writer.Write(serializedMessage.Length);
+                writer.WriteRaw(serializedMessage, 0, serializedMessage.Length);
+
+                using var packedMessage = Message.Create(0, writer);
+                
+                ProfiledIncomingMessageEvent?.Invoke(packedMessage.DataLength);
+            }
+
+            if (LatencyEmulationEnabled && _latencyMs > 0)
+            {
+                HandleUnpackedMessageWithDelay(unpackedMessage).Forget();
+                return;
+            }
+            
+            HandleUnpackedMessage(unpackedMessage);
+        }
+
+        private void OnPackedMessageReceived(object sender, MessageReceivedEventArgs e)
         {
             using var packedMessage = e.GetMessage();
+            
+            if (PacketLossEmulationEnabled && e.SendMode == SendMode.Unreliable && Random.Range(0f, 1f) <= _packetLossChance)
+                return;
 
-            HandleMessage(packedMessage);
-        }
+            if (NetworkProfilingEnabled)
+                ProfiledIncomingMessageEvent?.Invoke(packedMessage.DataLength);
 
-        private void HandleMessage(in Message packedMessage)
-        {
             if (!MessageIdRegistry.TryGetType(packedMessage.Tag, out var type))
                 throw new Exception($"Receiving unregistered message type {type}");
             
-            MessageEventBus.Invoke(packedMessage, type);
+            var messageData = (INetworkMessage)MessagePackSerializer.Deserialize(type, packedMessage.GetReader().ReadBytes(), _options);
+
+            if (LatencyEmulationEnabled && _latencyMs > 0)
+            {
+                HandleUnpackedMessageWithDelay(messageData).Forget();
+                return;
+            }
+            
+            HandleUnpackedMessage(messageData);
+        }
+
+        private void HandleUnpackedMessage(in INetworkMessage unpackedMessage)
+        {
+            MessageEventBus.Invoke(unpackedMessage);
+        }
+
+        private async UniTaskVoid HandleUnpackedMessageWithDelay(INetworkMessage unpackedMessage)
+        {
+            await UniTask.Delay(_latencyMs);
+
+            MessageEventBus.Invoke(unpackedMessage);
         }
     }
 }

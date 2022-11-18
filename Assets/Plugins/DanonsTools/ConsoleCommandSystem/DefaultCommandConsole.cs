@@ -10,7 +10,7 @@ namespace DanonsTools.ConsoleCommandSystem
 
         public void RegisterCommand(in IConsoleCommand command)
         {
-            RegisteredCommands.TryAdd(command.Keyword, command);
+            RegisteredCommands.TryAdd(command.Keyword.ToLower(), command);
         }
 
         public void ProcessInput(in string input)
@@ -23,7 +23,7 @@ namespace DanonsTools.ConsoleCommandSystem
 
             if (!RegisteredCommands.TryGetValue(splitInput[0], out var command))
             {
-                Log($"Unknown command '{splitInput[0]}'.", ConsoleLogType.Error);
+                Log($"Unknown command '{input.Split(' ')[0]}'.", ConsoleLogType.Error);
                 return;
             }
 

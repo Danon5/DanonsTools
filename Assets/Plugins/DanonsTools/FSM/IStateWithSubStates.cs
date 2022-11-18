@@ -1,4 +1,4 @@
-﻿namespace DanonsTools.FSM
+﻿namespace DanonsTools.Fsm
 {
     public interface IStateWithSubStates : IState, IStateMachine
     {

@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "com.sebaslab.svelto.ecs": "3.3.2",
     "com.unity.addressables": "1.19.19",
     "com.unity.feature.development": "1.0.1",
     "com.unity.ide.rider": "3.0.15",
@@ -42,5 +43,16 @@
     "com.unity.modules.vr": "1.0.0",
     "com.unity.modules.wind": "1.0.0",
     "com.unity.modules.xr": "1.0.0"
-  }
+  },
+  "scopedRegistries": [
+    {
+      "name": "OpenUPM",
+      "url": "https://package.openupm.com",
+      "scopes": [
+        "com.sebaslab.svelto.ecs",
+        "com.sebaslab.svelto.common",
+        "org.nuget.system.runtime.compilerservices.unsafe"
+      ]
+    }
+  ]
 }

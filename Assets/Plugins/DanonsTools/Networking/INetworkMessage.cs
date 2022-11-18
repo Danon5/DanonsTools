@@ -1,8 +1,6 @@
-﻿using DarkRift;
-
-namespace DanonsTools.Networking
+﻿namespace DanonsTools.Networking
 {
-    public interface INetworkMessage : IDarkRiftSerializable
+    public interface INetworkMessage
     {
         
     }

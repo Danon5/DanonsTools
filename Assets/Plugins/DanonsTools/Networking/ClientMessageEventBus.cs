@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using DarkRift;
 
 namespace DanonsTools.Networking
 {
@@ -42,15 +41,14 @@ namespace DanonsTools.Networking
             _bus[type] -= subscriber;
         }
 
-        public void Invoke(in Message message, in Type messageType)
+        public void Invoke(in INetworkMessage unpackedMessage)
         {
+            var messageType = unpackedMessage.GetType();
+            
             if (!_bus.ContainsKey(messageType))
                 throw new Exception($"Cannot invoke {messageType} as it is not registered.");
 
-            var messageData = (INetworkMessage)Activator.CreateInstance(messageType);
-            message.DeserializeInto(ref messageData);
-            
-            _bus[messageType]?.Invoke(messageData);
+            _bus[messageType]?.Invoke(unpackedMessage);
         }
 
         public bool HasEventRegistered(in Type type)

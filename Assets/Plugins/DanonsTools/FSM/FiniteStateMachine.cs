@@ -1,4 +1,4 @@
-﻿namespace DanonsTools.FSM
+﻿namespace DanonsTools.Fsm
 {
     public sealed class FiniteStateMachine : IStateMachine
     {
