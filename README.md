@@ -1,3 +1,3 @@
 # DanonsTools
-A collection of useful patterns for Unity development.
+A collection of implementations for Unity development.
 Primarily for my personal use.
