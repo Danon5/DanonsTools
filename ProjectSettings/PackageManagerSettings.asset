@@ -25,16 +25,7 @@ MonoBehaviour:
     m_Scopes: []
     m_IsDefault: 1
     m_Capabilities: 7
-  - m_Id: scoped:OpenUPM
-    m_Name: OpenUPM
-    m_Url: https://package.openupm.com
-    m_Scopes:
-    - com.sebaslab.svelto.ecs
-    - com.sebaslab.svelto.common
-    - org.nuget.system.runtime.compilerservices.unsafe
-    m_IsDefault: 0
-    m_Capabilities: 0
-  m_UserSelectedRegistryName: OpenUPM
+  m_UserSelectedRegistryName: 
   m_UserAddingNewScopedRegistry: 0
   m_RegistryInfoDraft:
     m_Modified: 0

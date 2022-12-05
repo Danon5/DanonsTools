@@ -1,4 +1,4 @@
-﻿using DanonsTools.DependencyInjection;
+﻿using DanonsTools.DependencyInjectionLayer;
 
 namespace DanonsTools.ServiceLayer
 {

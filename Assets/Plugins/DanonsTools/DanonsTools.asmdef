@@ -7,11 +7,9 @@
         "GUID:f51ebe6a0ceec4240a699833d6309b23",
         "GUID:593a5b492d29ac6448b1ebf7f035ef33",
         "GUID:5c01796d064528144a599661eaab93a6",
-        "GUID:bbde805d927e795439d7a746d1749cab",
-        "GUID:0c3d971be5ab3c929b4ddcd28867102d",
-        "GUID:12b54cc0583e3ccba858b8655d12ebf4",
         "GUID:7580dac7c168f2c428f828fb654f38b8",
-        "GUID:18ea31f6d3e227c4087225a8bfa0515a"
+        "GUID:18ea31f6d3e227c4087225a8bfa0515a",
+        "GUID:bbde805d927e795439d7a746d1749cab"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
